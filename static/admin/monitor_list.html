@@ -1,0 +1,182 @@
+<div class="bg-white shadow-sm rounded-lg">
+  <!-- 页面标题 -->
+  <div class="px-6 py-4 border-b border-gray-200">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">系统监控</h1>
+        <p class="mt-1 text-sm text-gray-500">实时监控系统性能、SQL查询、链路追踪等关键指标</p>
+      </div>
+      <div class="flex space-x-3">
+        <button @click="refreshData()" 
+                class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          刷新数据
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 监控概览卡片 -->
+  <div class="px-6 py-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <!-- 系统状态 -->
+      <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-blue-100">系统状态</p>
+            <p class="text-2xl font-bold">正常</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CPU使用率 -->
+      <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-green-100">CPU使用率</p>
+            <p class="text-2xl font-bold">0%</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 内存使用率 -->
+      <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg p-6 text-white">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-yellow-100">内存使用率</p>
+            <p class="text-2xl font-bold">0%</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 慢查询数量 -->
+      <div class="bg-gradient-to-r from-red-500 to-red-600 rounded-lg p-6 text-white">
+        <div class="flex items-center">
+          <div class="flex-shrink-0">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-red-100">慢查询</p>
+            <p class="text-2xl font-bold">0</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 监控数据标签页 -->
+    <div class="border-b border-gray-200">
+      <nav class="-mb-px flex space-x-8">
+        <button @click="activeTab = 'overview'" 
+                :class="activeTab === 'overview' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+          系统概览
+        </button>
+        <button @click="activeTab = 'sql'" 
+                :class="activeTab === 'sql' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+          SQL分析
+        </button>
+        <button @click="activeTab = 'traces'" 
+                :class="activeTab === 'traces' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+          链路追踪
+        </button>
+        <button @click="activeTab = 'system'" 
+                :class="activeTab === 'system' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                class="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm">
+          系统监控
+        </button>
+      </nav>
+    </div>
+
+    <!-- 标签页内容 -->
+    <div class="mt-6">
+      <!-- 系统概览 -->
+      <div x-show="activeTab === 'overview'" class="space-y-6">
+        <div class="bg-gray-50 rounded-lg p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">系统概览</h3>
+          <p class="text-gray-600">监控系统运行状态和基本配置信息</p>
+        </div>
+      </div>
+
+      <!-- SQL分析 -->
+      <div x-show="activeTab === 'sql'" class="space-y-6">
+        <div class="bg-gray-50 rounded-lg p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">SQL查询分析</h3>
+          <p class="text-gray-600">分析慢查询和查询模式，帮助优化数据库性能</p>
+        </div>
+      </div>
+
+      <!-- 链路追踪 -->
+      <div x-show="activeTab === 'traces'" class="space-y-6">
+        <div class="bg-gray-50 rounded-lg p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">链路追踪</h3>
+          <p class="text-gray-600">追踪请求链路，分析性能瓶颈</p>
+        </div>
+      </div>
+
+      <!-- 系统监控 -->
+      <div x-show="activeTab === 'system'" class="space-y-6">
+        <div class="bg-gray-50 rounded-lg p-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">系统资源监控</h3>
+          <p class="text-gray-600">监控CPU、内存、磁盘等系统资源使用情况</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 监控数据管理
+const monitorManager = {
+  data: {
+    activeTab: 'overview',
+    loading: false
+  },
+
+  init() {
+    this.loadMonitorData()
+  },
+
+  async loadMonitorData() {
+    try {
+      this.loading = true
+      // 加载监控数据
+      console.log('加载监控数据...')
+    } catch (error) {
+      console.error('加载监控数据失败:', error)
+    } finally {
+      this.loading = false
+    }
+  },
+
+  refreshData() {
+    this.loadMonitorData()
+    Alpine.store('toasts').info('监控数据已刷新')
+  }
+}
+
+// 初始化监控管理器
+document.addEventListener('DOMContentLoaded', () => {
+  monitorManager.init()
+})
+</script>

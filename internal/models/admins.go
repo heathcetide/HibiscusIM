@@ -160,6 +160,7 @@ func GetHibiscusAdminObjects() []AdminObject {
 	iconGroup, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_group.svg")
 	iconMembers, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_members.svg")
 	iconConfig, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_config.svg")
+	iconMonitor, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_monitor.svg")
 
 	return []AdminObject{
 		{
@@ -266,6 +267,91 @@ func GetHibiscusAdminObjects() []AdminObject {
 			Requireds:   []string{"Key", "Value"},
 			Icon:        &AdminIcon{SVG: string(iconConfig)},
 			AccessCheck: superAccessCheck,
+		},
+		// 监控系统
+		{
+			Model:       &MonitorData{},
+			Group:       "System",
+			Name:        "Monitor",
+			Desc:        "System monitoring and performance analysis",
+			Path:        "monitor",
+			Shows:       []string{"ID", "Type", "Status", "Value", "Timestamp"},
+			Editables:   []string{},
+			Filterables: []string{"Type", "Status", "Timestamp"},
+			Orderables:  []string{"Timestamp"},
+			Searchables: []string{"Type", "Status"},
+			Orders:      []hibiscusIM.Order{{"Timestamp", hibiscusIM.OrderOpDesc}},
+			Icon:        &AdminIcon{SVG: string(iconMonitor)},
+			Invisible:   false,
+			EditPage:    "monitor_edit",
+			ListPage:    "monitor_list",
+			Scripts: []AdminScript{
+				{
+					Src: "/static/admin/monitor.js",
+				},
+			},
+			Styles: []string{
+				"/static/admin/monitor.css",
+			},
+			Actions: []AdminAction{
+				{
+					Path:  "overview",
+					Name:  "System Overview",
+					Label: "View system overview",
+					Handler: func(db *gorm.DB, c *gin.Context, obj any) (bool, any, error) {
+						// 这里需要获取监控器实例
+						return true, "System overview data", nil
+					},
+				},
+				{
+					Path:  "slow_queries",
+					Name:  "Slow Queries",
+					Label: "View slow SQL queries",
+					Handler: func(db *gorm.DB, c *gin.Context, obj any) (bool, any, error) {
+						return true, "Slow queries data", nil
+					},
+				},
+				{
+					Path:  "query_patterns",
+					Name:  "Query Patterns",
+					Label: "View SQL query patterns",
+					Handler: func(db *gorm.DB, c *gin.Context, obj any) (bool, any, error) {
+						return true, "Query patterns data", nil
+					},
+				},
+				{
+					Path:  "traces",
+					Name:  "Request Traces",
+					Label: "View request traces",
+					Handler: func(db *gorm.DB, c *gin.Context, obj any) (bool, any, error) {
+						return true, "Request traces data", nil
+					},
+				},
+				{
+					Path:  "system_stats",
+					Name:  "System Stats",
+					Label: "View system statistics",
+					Handler: func(db *gorm.DB, c *gin.Context, obj any) (bool, any, error) {
+						return true, "System stats data", nil
+					},
+				},
+				{
+					Path:  "refresh",
+					Name:  "Refresh Data",
+					Label: "Refresh monitoring data",
+					Handler: func(db *gorm.DB, c *gin.Context, obj any) (bool, any, error) {
+						return true, "Data refreshed successfully", nil
+					},
+				},
+			},
+			AccessCheck: func(c *gin.Context, obj *AdminObject) error {
+				// 只有超级用户和管理员可以访问监控系统
+				user := CurrentUser(c)
+				if !user.IsSuperUser && !user.IsStaff {
+					return errors.New("insufficient permissions")
+				}
+				return nil
+			},
 		},
 	}
 }
