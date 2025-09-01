@@ -121,29 +121,17 @@ func (m *MonitorAdminObject) GetAdminObject() AdminObject {
 			}
 			return nil
 		},
-		BeforeRender: func(db *gorm.DB, ctx *gin.Context, vptr any) (any, error) {
-			data := vptr.(map[string]any)
-			// 在渲染前添加监控数据
-			data["monitor"] = map[string]interface{}{
-				"enabled":     m.monitor.IsEnabled(),
-				"config":      m.monitor.GetConfig(),
-				"overview":    m.monitor.GetSystemSummary(),
-				"slow_count":  len(m.monitor.GetSlowQueries(0)),
-				"trace_count": len(m.monitor.GetTracer().GetSpans()),
-			}
-			return data, nil
-		},
 	}
 }
 
 // MonitorData 监控数据结构
 type MonitorData struct {
-	ID        string                 `json:"id" gorm:"primaryKey"`
-	Type      string                 `json:"type"`      // 监控类型：system, sql, trace, metric
-	Status    string                 `json:"status"`    // 状态：normal, warning, error
-	Value     interface{}            `json:"value"`     // 监控值
-	Timestamp time.Time              `json:"timestamp"` // 时间戳
-	Metadata  map[string]interface{} `json:"metadata"`  // 元数据
+	ID        string    `json:"id" gorm:"primaryKey"`
+	Type      string    `json:"type"`      // 监控类型：system, sql, trace, metric
+	Status    string    `json:"status"`    // 状态：normal, warning, error
+	Value     string    `json:"value"`     // 监控值（JSON字符串）
+	Timestamp time.Time `json:"timestamp"` // 时间戳
+	Metadata  string    `json:"metadata"`  // 元数据（JSON字符串）
 }
 
 // TableName 返回表名
@@ -194,6 +182,17 @@ func (h *MonitorAPIHandler) RegisterRoutes(r *gin.RouterGroup) {
 
 // GetOverview 获取系统概览
 func (h *MonitorAPIHandler) GetOverview(c *gin.Context) {
+	if h.monitor == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": map[string]interface{}{
+				"message":   "监控系统未初始化",
+				"timestamp": time.Now(),
+			},
+		})
+		return
+	}
+
 	summary := h.monitor.GetSystemSummary()
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -203,6 +202,14 @@ func (h *MonitorAPIHandler) GetOverview(c *gin.Context) {
 
 // GetSystemStats 获取系统统计
 func (h *MonitorAPIHandler) GetSystemStats(c *gin.Context) {
+	if h.monitor == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    []interface{}{},
+		})
+		return
+	}
+
 	limitStr := c.DefaultQuery("limit", "100")
 	limit := 0
 	fmt.Sscanf(limitStr, "%d", &limit)
@@ -216,6 +223,14 @@ func (h *MonitorAPIHandler) GetSystemStats(c *gin.Context) {
 
 // GetLatestSystemStats 获取最新系统统计
 func (h *MonitorAPIHandler) GetLatestSystemStats(c *gin.Context) {
+	if h.monitor == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    nil,
+		})
+		return
+	}
+
 	stats := h.monitor.GetLatestSystemStats()
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -225,6 +240,14 @@ func (h *MonitorAPIHandler) GetLatestSystemStats(c *gin.Context) {
 
 // GetSlowQueries 获取慢查询列表
 func (h *MonitorAPIHandler) GetSlowQueries(c *gin.Context) {
+	if h.monitor == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    []interface{}{},
+		})
+		return
+	}
+
 	limitStr := c.DefaultQuery("limit", "50")
 	limit := 0
 	fmt.Sscanf(limitStr, "%d", &limit)
@@ -238,6 +261,14 @@ func (h *MonitorAPIHandler) GetSlowQueries(c *gin.Context) {
 
 // GetQueryPatterns 获取查询模式
 func (h *MonitorAPIHandler) GetQueryPatterns(c *gin.Context) {
+	if h.monitor == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    []interface{}{},
+		})
+		return
+	}
+
 	limitStr := c.DefaultQuery("limit", "50")
 	limit := 0
 	fmt.Sscanf(limitStr, "%d", &limit)
@@ -268,6 +299,14 @@ func (h *MonitorAPIHandler) GetSQLStats(c *gin.Context) {
 
 // GetQueriesByTable 按表获取查询
 func (h *MonitorAPIHandler) GetQueriesByTable(c *gin.Context) {
+	if h.monitor == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    []interface{}{},
+		})
+		return
+	}
+
 	table := c.Param("table")
 	limitStr := c.DefaultQuery("limit", "50")
 	limit := 0
@@ -282,6 +321,14 @@ func (h *MonitorAPIHandler) GetQueriesByTable(c *gin.Context) {
 
 // GetQueriesByOperation 按操作类型获取查询
 func (h *MonitorAPIHandler) GetQueriesByOperation(c *gin.Context) {
+	if h.monitor == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    []interface{}{},
+		})
+		return
+	}
+
 	operation := c.Param("operation")
 	limitStr := c.DefaultQuery("limit", "50")
 	limit := 0
@@ -357,6 +404,17 @@ func (h *MonitorAPIHandler) GetPrometheusMetrics(c *gin.Context) {
 
 // GetRealTimeData 获取实时数据
 func (h *MonitorAPIHandler) GetRealTimeData(c *gin.Context) {
+	if h.monitor == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": map[string]interface{}{
+				"timestamp": time.Now(),
+				"message":   "监控系统未初始化",
+			},
+		})
+		return
+	}
+
 	// 获取最新的监控数据
 	data := map[string]interface{}{
 		"timestamp": time.Now(),

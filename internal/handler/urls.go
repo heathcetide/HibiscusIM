@@ -108,6 +108,15 @@ func (h *Handlers) registerSystemRoutes(r *gin.RouterGroup) {
 	}
 }
 
+func (h *Handlers) registerMonitorRoutes(r *gin.RouterGroup) {
+	// 创建监控API处理器
+	monitorHandler := models.NewMonitorAPIHandler(nil) // 暂时传入nil，后续需要传入实际的monitor实例
+
+	// 注册监控API路由
+	monitorGroup := r.Group("monitor")
+	monitorHandler.RegisterRoutes(monitorGroup)
+}
+
 func (h *Handlers) registerGroupRoutes(r *gin.RouterGroup) {
 	group := r.Group("group")
 	group.OPTIONS("/*cors", func(c *gin.Context) {
@@ -171,4 +180,7 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 		},
 	}
 	models.RegisterAdmins(router, h.db, append(adminObjs, admins...))
+
+	// 注册监控API路由
+	h.registerMonitorRoutes(router)
 }
