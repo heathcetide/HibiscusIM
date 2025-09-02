@@ -3,7 +3,9 @@ package models
 import (
 	hibiscusIM "HibiscusIM"
 	constants "HibiscusIM/pkg/constant"
+	"HibiscusIM/pkg/metrics"
 	"HibiscusIM/pkg/util"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
@@ -181,7 +183,16 @@ func HashPassword(password string) string {
 
 func GetUserByUID(db *gorm.DB, userID uint) (*User, error) {
 	var val User
+	start := time.Now()
 	result := db.Where("id", userID).Where("enabled", true).Take(&val)
+	duration := time.Since(start)
+
+	// 记录数据库查询指标（如果监控系统可用）
+	if monitor := getMonitorFromContext(db); monitor != nil {
+		monitor.RecordSQLQuery(context.Background(), "SELECT * FROM users WHERE id = ? AND enabled = ?",
+			[]interface{}{userID, true}, "users", "SELECT", duration, 1, result.Error)
+	}
+
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -190,11 +201,26 @@ func GetUserByUID(db *gorm.DB, userID uint) (*User, error) {
 
 func GetUserByEmail(db *gorm.DB, email string) (user *User, err error) {
 	var val User
+	start := time.Now()
 	result := db.Table("users").Where("email", strings.ToLower(email)).Take(&val)
+	duration := time.Since(start)
+
+	// 记录数据库查询指标（如果监控系统可用）
+	if monitor := getMonitorFromContext(db); monitor != nil {
+		monitor.RecordSQLQuery(context.Background(), "SELECT * FROM users WHERE email = ?",
+			[]interface{}{email}, "users", "SELECT", duration, 1, result.Error)
+	}
+
 	if result.Error != nil {
 		return nil, result.Error
 	}
 	return &val, nil
+}
+
+// getMonitorFromContext 从上下文获取监控器（如果可用）
+func getMonitorFromContext(db *gorm.DB) *metrics.Monitor {
+	// 从全局变量获取监控器实例
+	return metrics.GetGlobalMonitor()
 }
 
 func IsExistsByEmail(db *gorm.DB, email string) bool {
@@ -210,11 +236,30 @@ func CreateUser(db *gorm.DB, email, password string) (*User, error) {
 		Activated: false,
 	}
 
+	start := time.Now()
 	result := db.Create(&user)
+	duration := time.Since(start)
+
+	// 记录数据库查询指标（如果监控系统可用）
+	if monitor := getMonitorFromContext(db); monitor != nil {
+		monitor.RecordSQLQuery(context.Background(), "INSERT INTO users (email, password, enabled, activated) VALUES (?, ?, ?, ?)",
+			[]interface{}{email, user.Password, true, false}, "users", "INSERT", duration, 1, result.Error)
+	}
+
 	return &user, result.Error
 }
 func UpdateUserFields(db *gorm.DB, user *User, vals map[string]any) error {
-	return db.Model(user).Updates(vals).Error
+	start := time.Now()
+	result := db.Model(user).Updates(vals)
+	duration := time.Since(start)
+
+	// 记录数据库查询指标（如果监控系统可用）
+	if monitor := getMonitorFromContext(db); monitor != nil {
+		monitor.RecordSQLQuery(context.Background(), "UPDATE users SET ... WHERE id = ?",
+			[]interface{}{user.ID}, "users", "UPDATE", duration, 1, result.Error)
+	}
+
+	return result.Error
 }
 
 func SetLastLogin(db *gorm.DB, user *User, lastIp string) error {
@@ -225,7 +270,18 @@ func SetLastLogin(db *gorm.DB, user *User, lastIp string) error {
 	}
 	user.LastLogin = &now
 	user.LastLoginIP = lastIp
-	return db.Model(user).Updates(vals).Error
+
+	start := time.Now()
+	result := db.Model(user).Updates(vals)
+	duration := time.Since(start)
+
+	// 记录数据库查询指标（如果监控系统可用）
+	if monitor := getMonitorFromContext(db); monitor != nil {
+		monitor.RecordSQLQuery(context.Background(), "UPDATE users SET LastLoginIP = ?, LastLogin = ? WHERE id = ?",
+			[]interface{}{lastIp, &now, user.ID}, "users", "UPDATE", duration, 1, result.Error)
+	}
+
+	return result.Error
 }
 
 func EncodeHashToken(user *User, timestamp int64, useLastlogin bool) (hash string) {

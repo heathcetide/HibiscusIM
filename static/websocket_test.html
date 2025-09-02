@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket测试</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>WebSocket测试页面</h1>
+    <div>
+        <input type="text" id="serverUrl" value="ws://localhost:8080/api/ws" />
+        <button onclick="connect()">连接</button>
+        <button onclick="disconnect()">断开</button>
+    </div>
+    <div>
+        <input type="text" id="message" placeholder="消息内容" />
+        <button onclick="sendMessage()">发送</button>
+    </div>
+    <div id="log"></div>
+
+    <script>
+        let ws = null;
+        
+        function connect() {
+            const url = document.getElementById('serverUrl').value;
+            ws = new WebSocket(url);
+            
+            ws.onopen = function() {
+                log('连接已建立');
+            };
+            
+            ws.onmessage = function(event) {
+                log('收到: ' + event.data);
+            };
+            
+            ws.onclose = function() {
+                log('连接已断开');
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+        
+        function sendMessage() {
+            const content = document.getElementById('message').value;
+            if (ws && content) {
+                const message = {
+                    type: 'chat',
+                    data: content,
+                    timestamp: Date.now()
+                };
+                ws.send(JSON.stringify(message));
+                log('发送: ' + content);
+            }
+        }
+        
+        function log(text) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + text + '</div>';
+        }
+    </script>
+</body>
+</html>

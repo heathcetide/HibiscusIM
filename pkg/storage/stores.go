@@ -8,8 +8,9 @@ import (
 
 const (
 	KindLocal = "local"
-	KindOss   = "oss" // aliyun
-	KindCos   = "cos" // tencent
+	KindOss   = "oss"   // aliyun
+	KindCos   = "cos"   // tencent
+	KindMinio = "minio" // minio/s3 compatible
 )
 
 var ErrInvalidPath = &util.Error{Code: http.StatusBadRequest, Message: "invalid path"}
@@ -30,6 +31,8 @@ func GetStore(kind string) Store {
 		return NewOssStore()
 	case KindCos:
 		return NewCosStore()
+	case KindMinio:
+		return NewMinioStore()
 	default:
 		return NewLocalStore()
 	}

@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon.png"/>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+    <title>系统监控 - HibiscusIM</title>
+    <script src="//cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/alpinejs@3.13.7/dist/cdn.min.js" defer></script>
+    <link href="//cdn.jsdelivr.net/npm/inter-ui@4.0.2/inter.min.css" rel="stylesheet"/>
+    <style>
+        :root {
+            font-family: 'Inter', sans-serif
+        }
+
+        [x-cloak] {
+            display: none
+        }
+
+        .card {
+            @apply bg-white border border-gray-200 rounded-lg shadow-sm
+        }
+
+        .btn {
+            @apply inline-flex items-center justify-center px-3 py-2 rounded border text-sm
+        }
+
+        .btn-primary {
+            @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700
+        }
+
+        .btn-default {
+            @apply border-gray-300 bg-white text-gray-700 hover:bg-gray-50
+        }
+
+        .badge {
+            @apply text-xs rounded px-2 py-0.5
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div x-data="monitorApp()" x-init="init()" class="min-h-screen" x-cloak>
+    <!-- 顶部栏 -->
+    <header class="bg-white/90 backdrop-blur border-b border-gray-200 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3">
+            <img src="/static/img/favicon.png" alt="" class="w-6 h-6 rounded"/>
+            <h1 class="text-lg sm:text-xl font-semibold text-gray-900">系统监控</h1>
+            <span class="text-xs text-gray-500 hidden sm:inline">HibiscusIM·可观测性面板</span>
+            <span class="flex-1"></span>
+            <div class="hidden sm:flex items-center gap-2">
+                <label class="text-sm text-gray-600">自动刷新</label>
+                <select class="border rounded px-2 py-1 text-sm" x-model.number="refreshSec"
+                        @change="restartAutoRefresh()">
+                    <option :value="0">关闭</option>
+                    <template x-for="s in [5,10,15,30,60,120]">
+                        <option :value="s" x-text="s + ' 秒'"></option>
+                    </template>
+                </select>
+                <button class="btn btn-default" @click="refreshAll()">刷新</button>
+            </div>
+            <div class="text-xs text-gray-500">最后更新：<span x-text="lastUpdate||'—'"></span></div>
+        </div>
+    </header>
+
+    <!-- 功能提示条 -->
+    <div class="bg-white border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center gap-2">
+            <span class="text-xs text-gray-500">功能：</span>
+            <template x-for="(on,key) in capabilities" :key="key">
+                <span class="badge"
+                      :class="on ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-400 border border-gray-200'"
+                      x-text="key"></span>
+            </template>
+            <span class="flex-1"></span>
+            <a href="/monitor/metric" target="_blank" class="text-xs text-purple-600 hover:underline">Prometheus /metrics</a>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="card">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex gap-6 px-4 sm:px-6 overflow-x-auto">
+                    <template x-for="tab in tabs" :key="tab.key">
+                        <button
+                                class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm"
+                                :class="activeTab === tab.key
+        ? 'border-blue-600 text-blue-600'
+        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                                @click="activeTab = tab.key; if (tab.key === 'overview') $nextTick(() => { ensureChart(); sysChart && sysChart.resize(); updateChart(); })">
+                            <span x-text="tab.name"></span>
+                        </button>
+                    </template>
+                </nav>
+            </div>
+
+            <!-- 概览 -->
+            <section x-show="activeTab==='overview'" class="p-4 sm:p-6 space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-base font-medium">系统资源趋势</h3>
+                            <div class="text-xs text-gray-500">/monitor/system</div>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="sysChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card p-4">
+                    <h3 class="text-base font-medium mb-2">系统信息</h3>
+                    <dl class="text-sm space-y-2">
+                        <div class="flex justify-between">
+                            <dt class="text-gray-500">主机名</dt>
+                            <dd x-text="overview.hostname||'—'"></dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-500">平台</dt>
+                            <dd x-text="overview.platform||'—'"></dd>
+                            <dd x-text="(overview.heap_alloc ?? 0) + ' B'"></dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-500">架构</dt>
+                            <dd x-text="overview.architecture||'—'"></dd>
+                            <dd x-text="overview.goroutines ?? 0"></dd>
+                        </div>
+                        <div class="flex justify-between">
+                            <dt class="text-gray-500">运行时间</dt>
+                            <dd x-text="formatUptime(overview.uptime)"></dd>
+                        </div>
+                    </dl>
+                </div>
+            </section>
+
+            <!-- SQL 分析 -->
+            <section x-show="activeTab==='sql'" class="p-4 sm:p-6 space-y-8">
+                <!-- 慢查询 -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-base font-medium">慢查询</h3>
+                        <div class="flex items-center gap-2 text-sm">
+                            <label>每页</label>
+                            <select class="border rounded px-1" x-model.number="slow.limit" @change="fetchSlow()">
+                                <template x-for="n in [10,20,50,100]">
+                                    <option :value="n" x-text="n"></option>
+                                </template>
+                            </select>
+                            <button class="btn btn-default" @click="exportJSON(slow.items,'slow_queries.json')">导出
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto border rounded">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left">SQL</th>
+                                <th class="px-3 py-2 text-left">表</th>
+                                <th class="px-3 py-2 text-left">操作</th>
+                                <th class="px-3 py-2 text-left">耗时</th>
+                                <th class="px-3 py-2 text-left">行数</th>
+                                <th class="px-3 py-2 text-left">时间</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <template x-if="slow.items.length===0">
+                                <tr>
+                                    <td class="px-3 py-6 text-center text-gray-400" colspan="6">暂无数据</td>
+                                </tr>
+                            </template>
+                            <template x-for="q in slow.items" :key="q.id">
+                                <tr class="border-t hover:bg-gray-50">
+                                    <td class="px-3 py-2 max-w-[360px] truncate" :title="q.sql" x-text="q.sql"></td>
+                                    <td class="px-3 py-2" x-text="q.table"></td>
+                                    <td class="px-3 py-2" x-text="q.operation"></td>
+                                    <td class="px-3 py-2" x-text="formatDuration(q.duration)"></td>
+                                    <td class="px-3 py-2" x-text="q.rows_affected"></td>
+                                    <td class="px-3 py-2" x-text="formatTime(q.start_time)"></td>
+                                </tr>
+                            </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end items-center gap-2 mt-2">
+                        <button class="btn btn-default" :disabled="slow.page<=1" @click="slow.page--; fetchSlow()">
+                            上一页
+                        </button>
+                        <div class="text-xs text-gray-600">第 <span x-text="slow.page"></span> 页</div>
+                        <button class="btn btn-default" @click="slow.page++; fetchSlow()">下一页</button>
+                    </div>
+                </div>
+
+                <!-- 查询模式 -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-base font-medium">查询模式</h3>
+                        <div class="flex items-center gap-2 text-sm">
+                            <label>每页</label>
+                            <select class="border rounded px-1" x-model.number="pattern.limit"
+                                    @change="fetchPatterns()">
+                                <template x-for="n in [10,20,50,100]">
+                                    <option :value="n" x-text="n"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto border rounded">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left">模式</th>
+                                <th class="px-3 py-2 text-left">次数</th>
+                                <th class="px-3 py-2 text-left">平均耗时</th>
+                                <th class="px-3 py-2 text-left">最大耗时</th>
+                                <th class="px-3 py-2 text-left">最后执行</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <template x-if="pattern.items.length===0">
+                                <tr>
+                                    <td class="px-3 py-6 text-center text-gray-400" colspan="5">暂无数据</td>
+                                </tr>
+                            </template>
+                            <template x-for="p in pattern.items" :key="p.pattern">
+                                <tr class="border-t hover:bg-gray-50">
+                                    <td class="px-3 py-2 max-w-[360px] truncate" :title="p.pattern"
+                                        x-text="p.pattern"></td>
+                                    <td class="px-3 py-2" x-text="p.count"></td>
+                                    <td class="px-3 py-2" x-text="formatDuration(p.avg_time)"></td>
+                                    <td class="px-3 py-2" x-text="formatDuration(p.max_time)"></td>
+                                    <td class="px-3 py-2" x-text="formatTime(p.last_seen)"></td>
+                                </tr>
+                            </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="flex justify-end items-center gap-2 mt-2">
+                        <button class="btn btn-default" :disabled="pattern.page<=1"
+                                @click="pattern.page--; fetchPatterns()">上一页
+                        </button>
+                        <div class="text-xs text-gray-600">第 <span x-text="pattern.page"></span> 页</div>
+                        <button class="btn btn-default" @click="pattern.page++; fetchPatterns()">下一页</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 链路追踪 -->
+            <section x-show="activeTab==='traces'" class="p-4 sm:p-6 space-y-4">
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="text-sm">状态</label>
+                    <select class="border rounded px-2 py-1 text-sm" x-model="trace.filter.status"
+                            @change="debouncedTraces()">
+                        <option value="">全部</option>
+                        <option value="OK">OK</option>
+                        <option value="ERROR">ERROR</option>
+                    </select>
+                    <input class="border rounded px-2 py-1 text-sm" placeholder="按 name 前缀过滤"
+                           x-model="trace.filter.name" @input="debouncedTraces()"/>
+                    <span class="flex-1"></span>
+                    <label class="text-sm">每页</label>
+                    <select class="border rounded px-1" x-model.number="trace.limit" @change="fetchTraces()">
+                        <template x-for="n in [10,20,50,100]">
+                            <option :value="n" x-text="n"></option>
+                        </template>
+                    </select>
+                </div>
+                <div class="overflow-x-auto border rounded">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left">TraceID</th>
+                            <th class="px-3 py-2 text-left">Name</th>
+                            <th class="px-3 py-2 text-left">开始</th>
+                            <th class="px-3 py-2 text-left">耗时</th>
+                            <th class="px-3 py-2 text-left">状态</th>
+                            <th class="px-3 py-2 text-left">操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <template x-if="trace.items.length===0">
+                            <tr>
+                                <td class="px-3 py-6 text-center text-gray-400" colspan="6">暂无数据</td>
+                            </tr>
+                        </template>
+                        <template x-for="s in trace.items" :key="s.id">
+                            <tr class="border-t hover:bg-gray-50">
+                                <td class="px-3 py-2" x-text="s.trace_id"></td>
+                                <td class="px-3 py-2" x-text="s.name"></td>
+                                <td class="px-3 py-2" x-text="formatTime(s.start_time)"></td>
+                                <td class="px-3 py-2" x-text="formatDuration(s.duration)"></td>
+                                <td class="px-3 py-2">
+                                    <span class="badge"
+                                          :class="s.status==='OK'?'bg-green-100 text-green-700':'bg-red-100 text-red-700'"
+                                          x-text="s.status"></span>
+                                </td>
+                                <td class="px-3 py-2">
+                                    <button class="text-blue-600 hover:underline" @click="openTrace(s.trace_id)">详情
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="flex justify-end items-center gap-2">
+                    <button class="btn btn-default" :disabled="trace.page<=1" @click="trace.page--; fetchTraces()">
+                        上一页
+                    </button>
+                    <div class="text-xs text-gray-600">第 <span x-text="trace.page"></span> 页</div>
+                    <button class="btn btn-default" @click="trace.page++; fetchTraces()">下一页</button>
+                </div>
+
+                <!-- 详情弹窗 -->
+                <div x-show="trace.modal.open"
+                     class="fixed inset-0 bg-black/30 z-40 flex items-center justify-center p-4"
+                     @click.self="trace.modal.open=false">
+                    <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] overflow-auto p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-base font-medium">Trace 详情</h3>
+                            <button class="text-gray-400 hover:text-gray-600" @click="trace.modal.open=false">✕</button>
+                        </div>
+                        <div class="text-xs text-gray-500 mb-2">TraceID：<span x-text="trace.modal.id"></span></div>
+                        <template x-if="trace.modal.loading">
+                            <div class="text-sm text-gray-500">加载中…</div>
+                        </template>
+                        <template x-if="!trace.modal.loading">
+                            <div>
+                                <ul class="space-y-2">
+                                    <template x-for="sp in trace.modal.spans" :key="sp.id">
+                                        <li class="card p-2">
+                                            <div class="flex items-center justify-between">
+                                                <div class="font-mono text-sm" x-text="sp.name"></div>
+                                                <div class="text-xs text-gray-500"
+                                                     x-text="formatDuration(sp.duration)"></div>
+                                            </div>
+                                            <div class="text-xs text-gray-500">开始：<span
+                                                    x-text="formatTime(sp.start_time)"></span></div>
+                                            <div class="text-xs text-gray-500">状态：<span x-text="sp.status"></span>
+                                            </div>
+                                            <template x-if="sp.tags && Object.keys(sp.tags).length">
+                                                <div class="mt-1 text-xs">
+                                                    <span class="text-gray-500">Tags:</span>
+                                                    <template x-for="(v,k) in sp.tags" :key="k"><span
+                                                            class="ml-1 px-1 bg-gray-100 rounded"
+                                                            x-text="k+':'+v"></span></template>
+                                                </div>
+                                            </template>
+                                        </li>
+                                    </template>
+                                </ul>
+                                <div class="mt-3 text-right">
+                                    <button class="btn btn-default"
+                                            @click="exportJSON(trace.modal.spans,'trace_'+trace.modal.id+'.json')">导出
+                                        JSON
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 系统监控列表 -->
+            <section x-show="activeTab==='system'" class="p-4 sm:p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-base font-medium">历史样本</h3>
+                    <div class="text-xs text-gray-500">来源 /monitor/system</div>
+                </div>
+                <div class="overflow-x-auto border rounded">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left">时间</th>
+                            <th class="px-3 py-2 text-left">CPU%</th>
+                            <th class="px-3 py-2 text-left">内存%</th>
+                            <th class="px-3 py-2 text-left">磁盘%</th>
+                            <th class="px-3 py-2 text-left">Goroutines</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <template x-if="system.items.length===0">
+                            <tr>
+                                <td class="px-3 py-6 text-center text-gray-400" colspan="5">暂无数据</td>
+                            </tr>
+                        </template>
+                        <template x-for="s in system.items" :key="s.timestamp">
+                            <tr class="border-t">
+                                <td class="px-3 py-2" x-text="formatTime(s.timestamp)"></td>
+                                <td class="px-3 py-2" x-text="(s.cpu?.usage_percent??0).toFixed(1)"></td>
+                                <td class="px-3 py-2" x-text="(s.memory?.usage_percent??0).toFixed(1)"></td>
+                                <td class="px-3 py-2" x-text="(s.disk?.usage_percent??0).toFixed(1)"></td>
+                                <td class="px-3 py-2" x-text="s.runtime?.goroutines??0"></td>
+                            </tr>
+                        </template>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- 右下角悬浮：快速导出 & 回到顶部 -->
+        <div class="fixed bottom-4 right-4 flex flex-col gap-2">
+            <button class="btn btn-primary shadow"
+                    @click="exportJSON({overview,systemLine,slow:slow.items,pattern:pattern.items}, 'monitor_snapshot.json')">
+                导出快照
+            </button>
+            <button class="btn btn-default shadow" @click="window.scrollTo({top:0,behavior:'smooth'})">↑ 顶部</button>
+        </div>
+    </main>
+</div>
+
+<script>
+    function monitorApp() {
+        return {
+            // tabs
+            tabs: [{key: 'overview', name: '概览'}, {key: 'sql', name: 'SQL 分析'}, {
+                key: 'traces',
+                name: '链路追踪'
+            }, {key: 'system', name: '系统监控'}],
+            activeTab: 'overview',
+
+            // 状态
+            lastUpdate: '', refreshSec: 30, timer: null,
+            capabilities: {},
+
+            // 数据模型
+            overview: {}, systemLine: [], system: {items: []},
+            slow: {items: [], page: 1, limit: 20},
+            pattern: {items: [], page: 1, limit: 20},
+            trace: {
+                items: [],
+                page: 1,
+                limit: 20,
+                filter: {status: '', name: ''},
+                modal: {open: false, id: '', loading: false, spans: []}
+            },
+            // 保证有且仅有一个 Chart 实例
+            ensureChart() {
+                const el = document.getElementById('sysChart');
+                if (!el) return;
+                if (this.sysChart) return;              // 已有就别重复建
+                this.sysChart = new Chart(el, {
+                    type: 'line',
+                    data: {
+                        labels: [], datasets: [
+                            {
+                                label: 'CPU %',
+                                data: [],
+                                borderColor: 'rgb(59,130,246)',
+                                backgroundColor: 'rgba(59,130,246,.12)',
+                                tension: .15
+                            },
+                            {
+                                label: '内存 %',
+                                data: [],
+                                borderColor: 'rgb(16,185,129)',
+                                backgroundColor: 'rgba(16,185,129,.12)',
+                                tension: .15
+                            },
+                        ]
+                    },
+                    options: {responsive: true, maintainAspectRatio: false, scales: {y: {beginAtZero: true, max: 100}}}
+                });
+            },
+
+            // 图表
+            sysChart: null,
+
+            // 初始化
+            async init() {
+                await this.fetchMeta();
+                await this.refreshAll();
+                // 确保画布在可见状态再初始化
+                this.$nextTick(() => {
+                    if (this.activeTab === 'overview') {
+                        this.ensureChart();
+                        this.updateChart();
+                    }
+                });
+                this.restartAutoRefresh();
+                window.addEventListener('resize', () => { this.sysChart && this.sysChart.resize() }, { passive: true });
+            },
+
+            // 自动刷新
+            restartAutoRefresh() {
+                if (this.timer) clearInterval(this.timer);
+                if (this.refreshSec > 0) {
+                    this.timer = setInterval(() => this.refreshAll(), this.refreshSec * 1000);
+                }
+            },
+
+            // 汇总刷新
+            async refreshAll() {
+                await Promise.all([
+                    this.fetchOverview(),
+                    this.fetchSystemLine(),
+                    this.fetchSlow(),
+                    this.fetchPatterns(),
+                    this.fetchTraces()
+                ]);
+                this.lastUpdate = new Date().toLocaleString('zh-CN');
+                this.updateChart();
+            },
+
+            // 元信息
+            async fetchMeta() {
+                try {
+                    const r = await fetch('/monitor/ui.json');
+                    const j = await r.json();
+                    if (j.success) {
+                        this.capabilities = j.data.capabilities || {};
+                        if (j.data?.defaults?.refresh_seconds != null) this.refreshSec = j.data.defaults.refresh_seconds;
+                    }
+                } catch (e) {
+                    console.warn('ui.json error', e);
+                }
+            },
+
+            // 各数据源
+            async fetchOverview() {
+                const j = await this.safeJSON('/monitor/overview');
+                if (j?.success) {
+                    // 兼容两种结构：data.system优先，否则就用data
+                    this.overview = j.data?.system || j.data || {};
+                    // 如需后续用到 sql/tracing 等，可另外存起来
+                    this.overviewMeta = j.data || {};
+                }
+            },
+            async fetchSystemLine() {
+                const j = await this.safeJSON('/monitor/system?limit=60');
+                if (j?.success) {
+                    this.systemLine = j.data || [];
+                    this.system.items = this.systemLine;
+                }
+                // 如果图表已创建，立即更新；否则等切到概览再建
+                if (this.activeTab === 'overview') {
+                    this.$nextTick(() => {
+                        this.ensureChart();
+                        this.updateChart();
+                    });
+                }
+            },
+            async fetchSlow() {
+                const j = await this.safeJSON(`/monitor/sql/slow?limit=${this.slow.limit}&page=${this.slow.page}`);
+                if (j?.success) this.slow.items = j.data || [];
+            },
+            async fetchPatterns() {
+                const j = await this.safeJSON(`/monitor/sql/patterns?limit=${this.pattern.limit}&page=${this.pattern.page}`);
+                if (j?.success) this.pattern.items = j.data || [];
+            },
+            async fetchTraces() {
+                const qs = new URLSearchParams({
+                    limit: this.trace.limit,
+                    page: this.trace.page,
+                    status: this.trace.filter.status || '',
+                    name: this.trace.filter.name || ''
+                }).toString();
+                const j = await this.safeJSON(`/monitor/traces?${qs}`);
+                if (j?.success) this.trace.items = j.data || [];
+            },
+
+            // Trace 详情
+            async openTrace(traceId) {
+                this.trace.modal.open = true;
+                this.trace.modal.id = traceId;
+                this.trace.modal.loading = true;
+                this.trace.modal.spans = [];
+                const j = await this.safeJSON(`/monitor/traces/${encodeURIComponent(traceId)}`);
+                if (j?.success) this.trace.modal.spans = j.data || [];
+                this.trace.modal.loading = false;
+            },
+
+            // Chart
+            initChart() {
+                const ctx = document.getElementById('sysChart');
+                if (!ctx) return;
+                this.sysChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [], datasets: [
+                            {
+                                label: 'CPU %',
+                                data: [],
+                                borderColor: 'rgb(59,130,246)',
+                                backgroundColor: 'rgba(59,130,246,.12)',
+                                tension: .15
+                            },
+                            {
+                                label: '内存 %',
+                                data: [],
+                                borderColor: 'rgb(16,185,129)',
+                                backgroundColor: 'rgba(16,185,129,.12)',
+                                tension: .15
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {y: {beginAtZero: true, max: 100}},
+                        plugins: {legend: {display: true}}
+                    }
+                });
+            },
+            updateChart() {
+                if (!this.sysChart) return;
+                const labels = this.systemLine.map(s => new Date(s.timestamp).toLocaleTimeString('zh-CN'));
+                const cpu = this.systemLine.map(s => s.cpu?.usage_percent ?? 0);
+                const mem = this.systemLine.map(s => s.memory?.usage_percent ?? 0);
+                this.sysChart.data.labels = labels;
+                this.sysChart.data.datasets[0].data = cpu;
+                this.sysChart.data.datasets[1].data = mem;
+                this.sysChart.update();
+            },
+
+            // Utils
+            async safeJSON(url) {
+                try {
+                    const r = await fetch(url);
+                    const t = await r.text();
+                    try {
+                        return JSON.parse(t);
+                    } catch {
+                        return {success: false, data: t};
+                    }
+                } catch (e) {
+                    console.warn('fetch error', url, e);
+                    return null;
+                }
+            },
+            formatDuration(d) {
+                if (!d && d !== 0) return '—';
+                if (typeof d === 'string') return d;
+                const ms = parseInt(d, 10);
+                if (isNaN(ms)) return d;
+                if (ms < 1000) return ms + 'ms';
+                if (ms < 60000) return (ms / 1000).toFixed(2) + 's';
+                return (ms / 60000).toFixed(2) + 'm';
+            },
+            formatTime(t) {
+                return t ? new Date(t).toLocaleString('zh-CN') : '—';
+            },
+            formatUptime(sec) {
+                if (!sec) return '—';
+                const h = Math.floor(sec / 3600), d = Math.floor(h / 24);
+                return d ? `${d}天 ${h % 24}小时` : `${h}小时`;
+            },
+            exportJSON(obj, name) {
+                const blob = new Blob([JSON.stringify(obj, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url));
+            },
+            debounce(fn, ms) {
+                let to = null;
+                return (...args) => {
+                    clearTimeout(to);
+                    to = setTimeout(() => fn.apply(this, args), ms);
+                };
+            },
+            debouncedTraces() {
+                if (!this._debounced) this._debounced = this.debounce(() => this.fetchTraces(), 300);
+                this._debounced();
+            }
+        }
+    }
+</script>
+</body>
+</html>

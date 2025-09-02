@@ -7,18 +7,25 @@ import (
 	"HibiscusIM/pkg/config"
 	"HibiscusIM/pkg/middleware"
 	"HibiscusIM/pkg/notification"
+	"HibiscusIM/pkg/websocket"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type Handlers struct {
-	db *gorm.DB
+	db    *gorm.DB
+	wsHub *websocket.Hub
 }
 
 func NewHandlers(db *gorm.DB) *Handlers {
+	// 创建WebSocket Hub
+	wsConfig := websocket.LoadConfigFromEnv()
+	wsHub := websocket.NewHub(wsConfig)
+
 	return &Handlers{
-		db: db,
+		db:    db,
+		wsHub: wsHub,
 	}
 }
 
@@ -34,6 +41,7 @@ func (h *Handlers) Register(engine *gin.Engine) {
 	h.registerAuthRoutes(r)
 	h.registerNotificationRoutes(r)
 	h.registerGroupRoutes(r)
+	h.registerWebSocketRoutes(r)
 
 	objs := h.GetObjs()
 	hibiscusIM.RegisterObjects(r, objs)
@@ -108,15 +116,6 @@ func (h *Handlers) registerSystemRoutes(r *gin.RouterGroup) {
 	}
 }
 
-func (h *Handlers) registerMonitorRoutes(r *gin.RouterGroup) {
-	// 创建监控API处理器
-	monitorHandler := models.NewMonitorAPIHandler(nil) // 暂时传入nil，后续需要传入实际的monitor实例
-
-	// 注册监控API路由
-	monitorGroup := r.Group("monitor")
-	monitorHandler.RegisterRoutes(monitorGroup)
-}
-
 func (h *Handlers) registerGroupRoutes(r *gin.RouterGroup) {
 	group := r.Group("group")
 	group.OPTIONS("/*cors", func(c *gin.Context) {
@@ -181,6 +180,26 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 	}
 	models.RegisterAdmins(router, h.db, append(adminObjs, admins...))
 
-	// 注册监控API路由
-	h.registerMonitorRoutes(router)
+}
+
+// registerWebSocketRoutes 注册WebSocket路由
+func (h *Handlers) registerWebSocketRoutes(r *gin.RouterGroup) {
+	wsHandler := websocket.NewHandler(h.wsHub)
+
+	// WebSocket连接端点
+	r.GET("/ws", models.AuthRequired, wsHandler.HandleWebSocket)
+
+	// WebSocket管理API端点
+	wsGroup := r.Group("/ws")
+	wsGroup.Use(models.AuthRequired)
+	{
+		wsGroup.GET("/stats", wsHandler.GetStats)
+		wsGroup.GET("/health", wsHandler.HealthCheck)
+		wsGroup.GET("/user/:user_id", wsHandler.GetUserStats)
+		wsGroup.GET("/group/:group", wsHandler.GetGroupStats)
+		wsGroup.POST("/message", wsHandler.SendMessage)
+		wsGroup.POST("/broadcast", wsHandler.BroadcastMessage)
+		wsGroup.DELETE("/user/:user_id", wsHandler.DisconnectUser)
+		wsGroup.DELETE("/group/:group", wsHandler.DisconnectGroup)
+	}
 }

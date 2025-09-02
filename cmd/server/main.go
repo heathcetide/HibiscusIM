@@ -9,6 +9,7 @@ import (
 	"HibiscusIM/pkg/config"
 	constants "HibiscusIM/pkg/constant"
 	"HibiscusIM/pkg/logger"
+	"HibiscusIM/pkg/metrics"
 	"HibiscusIM/pkg/middleware"
 	"HibiscusIM/pkg/notification"
 	"HibiscusIM/pkg/util"
@@ -211,7 +212,26 @@ func main() {
 	// 10. New App
 	app := NewHibiscusIMApp(db)
 
-	// 11. Start timed task
+	// 11. Initialize monitoring system
+	monitor := metrics.NewMonitor(&metrics.MonitorConfig{
+		EnableMetrics:       true,
+		EnableTracing:       true,
+		MaxSpans:            10000,
+		EnableSQLAnalysis:   true,
+		MaxQueries:          10000,
+		SlowThreshold:       100 * time.Millisecond,
+		EnableSystemMonitor: true,
+		MaxStats:            1000,
+		MonitorInterval:     30 * time.Second,
+	})
+
+	// 设置全局监控器实例
+	metrics.SetGlobalMonitor(monitor)
+
+	monitor.Start()
+	defer monitor.Stop()
+
+	// 12. Start timed task
 	go task.StartOfflineChecker(db)
 
 	// 12. Initialize gin routing
@@ -220,6 +240,9 @@ func main() {
 	r.LoadHTMLGlob("templates/**/**")
 
 	// 13. use middleware
+
+	// Monitoring Middleware
+	r.Use(metrics.MonitorMiddleware(monitor))
 
 	// Cookie Register
 	secret := util.GetEnv(constants.ENV_SESSION_SECRET)
@@ -248,7 +271,12 @@ func main() {
 	// 14. Register Routes
 	app.RegisterRoutes(r)
 
-	// 15. Initialize User Listener
+	// 15. Register Monitoring API Routes
+	monitorAPI := metrics.NewMonitorAPI(monitor)
+	monitorGroup := r.Group("/monitor")
+	monitorAPI.RegisterRoutes(monitorGroup)
+
+	// 16. Initialize User Listener
 	listeners.InitUserListeners()
 
 	logger.Info("server run success", zap.String("addr", addr))
