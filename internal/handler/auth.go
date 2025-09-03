@@ -378,6 +378,40 @@ func (h *Handlers) handleUserUpdate(c *gin.Context) {
 	response.Success(c, "update user success", nil)
 }
 
+// handleUserUpdate Update User Info
+func (h *Handlers) handleUserUpdateBasicInfo(c *gin.Context) {
+	var req models.UserBasicInfoUpdate
+	if err := c.ShouldBind(&req); err != nil {
+		response.Fail(c, "Invalid request", err)
+		return
+	}
+	user := models.CurrentUser(c)
+	if user.HasBasicInfo() {
+		response.Fail(c, "user is already a basic info", nil)
+		return
+	}
+	vals := make(map[string]interface{})
+
+	if req.WifiName != "" {
+		vals["wifiName"] = req.WifiName
+	}
+	if req.WifiPassword != "" {
+		vals["wifiPassword"] = req.WifiPassword
+	}
+	if req.FatherCallName != "" {
+		vals["fatherCallName"] = req.FatherCallName
+	}
+	if req.MotherCallName != "" {
+		vals["motherCallName"] = req.MotherCallName
+	}
+	err := models.UpdateUser(h.db, user, vals)
+	if err != nil {
+		response.Fail(c, "update user failed", err)
+		return
+	}
+	response.Success(c, "handle update user success", nil)
+}
+
 func (h *Handlers) handleUserUpdatePreferences(c *gin.Context) {
 	var preferences struct {
 		EmailNotifications bool `json:"emailNotifications"`

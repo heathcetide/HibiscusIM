@@ -187,6 +187,11 @@ func main() {
 		&models.User{},
 		&models.Group{},
 		&models.GroupMember{},
+		&models.Question{},
+		&models.Answer{},
+		&models.Questionnaire{},
+		&models.QuestionnaireResponse{},
+		&models.RecordingPrompt{},
 		&notification.InternalNotification{},
 		&middleware.OperationLog{},
 	})

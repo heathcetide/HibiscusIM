@@ -23,6 +23,13 @@ type BaseModel struct {
 	isDel    int8 `gorm:"index"`
 }
 
+type UserBasicInfoUpdate struct {
+	FatherCallName string `json:"fatherCallName"`
+	MotherCallName string `json:"motherCallName"`
+	WifiName       string `json:"wifiName"`
+	WifiPassword   string `json:"wifiPassword"`
+}
+
 type User struct {
 	ID        uint       `json:"-" gorm:"primaryKey"`
 	CreatedAt time.Time  `json:"-" gorm:"autoCreateTime"`
@@ -56,6 +63,18 @@ type User struct {
 	Country      string `json:"country,omitempty"`
 	Extra        string `json:"extra,omitempty"`
 	PrivateExtra string `json:"privateExtra,omitempty"`
+
+	// New fields for basic information input
+	FatherCallName   string `json:"fatherCallName,omitempty" gorm:"size:128"`
+	MotherCallName   string `json:"motherCallName,omitempty" gorm:"size:128"`
+	WiFiName         string `json:"wifiName,omitempty" gorm:"size:128"`
+	WiFiPassword     string `json:"wifiPassword,omitempty" gorm:"size:128"`
+	HasFilledDetails bool   `json:"hasFilledDetails"`
+}
+
+// Check BasicInfo
+func (u *User) HasBasicInfo() bool {
+	return u.HasFilledDetails
 }
 
 type GroupPermission struct {

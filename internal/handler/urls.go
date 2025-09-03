@@ -67,6 +67,8 @@ func (h *Handlers) Register(engine *gin.Engine) {
 	h.registerNotificationRoutes(r)
 	h.registerGroupRoutes(r)
 	h.registerWebSocketRoutes(r)
+	h.registerVoicesRoutes(r)
+	h.registerQuestionRoutes(r)
 
 	objs := h.GetObjs()
 	hibiscusIM.RegisterObjects(r, objs)
@@ -114,6 +116,8 @@ func (h *Handlers) registerAuthRoutes(r *gin.RouterGroup) {
 		auth.PUT("/update", models.AuthRequired, h.handleUserUpdate)
 
 		auth.PUT("/update/preferences", models.AuthRequired, h.handleUserUpdatePreferences)
+
+		auth.POST("/update/basic/info", models.AuthRequired, h.handleUserUpdateBasicInfo)
 	}
 }
 
@@ -163,10 +167,27 @@ func (h *Handlers) registerGroupRoutes(r *gin.RouterGroup) {
 	}
 }
 
+func (h *Handlers) registerQuestionRoutes(r *gin.RouterGroup) {
+	question := r.Group("question")
+	question.Use(models.AuthRequired)
+	{
+		question.POST("/", h.handleWriteQuestionnaire)
+
+		question.GET("/responses", h.handleGetQuestionResponseById)
+	}
+}
+
+func (h *Handlers) registerVoicesRoutes(r *gin.RouterGroup) {
+	voices := r.Group("voices")
+	{
+		voices.GET("/", h.handleGetRecordingPrompts)
+	}
+}
+
 func (h *Handlers) GetObjs() []hibiscusIM.WebObject {
 	return []hibiscusIM.WebObject{
 		{
-			Group:       "hibiscusIM",
+			Group:       "hibiscus",
 			Desc:        "用户",
 			Model:       models.User{},
 			Name:        "user",
@@ -191,6 +212,10 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 	adminObjs := models.GetHibiscusAdminObjects()
 	iconInternalNotification, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_internal_notification.svg")
 	iconOperatorLog, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_operator_log.svg")
+	iconQuestion, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_question.svg")
+	iconQuestionnaire, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_questionnaire.svg")
+	iconAnswer, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_answer.svg")
+	iconQuestionnaireResponse, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_questionnaire_response.svg")
 	admins := []models.AdminObject{
 		{
 			Model:       &notification.InternalNotification{},
@@ -213,6 +238,50 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 			Orderables:  []string{"CreatedAt"},                                       // 可排序字段
 			Searchables: []string{"Username", "Action", "Target"},                    // 可搜索字段
 			Icon:        &models.AdminIcon{SVG: string(iconOperatorLog)},             // 图标
+		},
+		{
+			Model:       &models.Question{},                           // 关联 Question 模型
+			Group:       "Survey",                                     // 业务组
+			Name:        "Question",                                   // 管理员后台展示的名称
+			Desc:        "This is the question in a questionnaire.",   // 描述
+			Shows:       []string{"ID", "Text", "Type", "Options"},    // 显示的字段
+			Editables:   []string{"Text", "Type", "Options"},          // 可编辑字段
+			Orderables:  []string{"CreatedAt"},                        // 可排序字段
+			Searchables: []string{"Text", "Type"},                     // 可搜索字段
+			Icon:        &models.AdminIcon{SVG: string(iconQuestion)}, // 图标
+		},
+		{
+			Model:       &models.Questionnaire{},                               // 关联 Questionnaire 模型
+			Group:       "Survey",                                              // 业务组
+			Name:        "Questionnaire",                                       // 管理员后台展示的名称
+			Desc:        "This is a questionnaire, a collection of questions.", // 描述
+			Shows:       []string{"ID", "Title", "Description", "CreatedAt"},   // 显示的字段
+			Editables:   []string{"Title", "Description"},                      // 可编辑字段
+			Orderables:  []string{"CreatedAt"},                                 // 可排序字段
+			Searchables: []string{"Title", "Description"},                      // 可搜索字段
+			Icon:        &models.AdminIcon{SVG: string(iconQuestionnaire)},     // 图标
+		},
+		{
+			Model:       &models.Answer{},                                                         // 关联 Answer 模型
+			Group:       "Survey",                                                                 // 业务组
+			Name:        "Answer",                                                                 // 管理员后台展示的名称
+			Desc:        "This is the answer provided by the user for a specific question.",       // 描述
+			Shows:       []string{"ID", "ResponseID", "QuestionID", "AnswerText", "AnswerOption"}, // 显示的字段
+			Editables:   []string{"ResponseID", "QuestionID", "AnswerText", "AnswerOption"},       // 可编辑字段
+			Orderables:  []string{"CreatedAt"},                                                    // 可排序字段
+			Searchables: []string{"AnswerText", "AnswerOption"},                                   // 可搜索字段
+			Icon:        &models.AdminIcon{SVG: string(iconAnswer)},                               // 图标
+		},
+		{
+			Model:       &models.QuestionnaireResponse{},                           // 关联 QuestionnaireResponse 模型
+			Group:       "Survey",                                                  // 业务组
+			Name:        "Questionnaire Response",                                  // 管理员后台展示的名称
+			Desc:        "This records the responses of users to a questionnaire.", // 描述
+			Shows:       []string{"ID", "UserID", "QuestionnaireID", "CreatedAt"},  // 显示的字段
+			Editables:   []string{"UserID", "QuestionnaireID"},                     // 可编辑字段
+			Orderables:  []string{"CreatedAt"},                                     // 可排序字段
+			Searchables: []string{"UserID", "QuestionnaireID"},                     // 可搜索字段
+			Icon:        &models.AdminIcon{SVG: string(iconQuestionnaireResponse)}, // 图标
 		},
 	}
 	models.RegisterAdmins(router, h.db, append(adminObjs, admins...))
