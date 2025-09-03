@@ -1,0 +1,5 @@
+{
+  "Hello": "Hello",
+  "Goodbye": "Goodbye",
+  "LoginSuccess": "Welcome back, {username}!"
+}

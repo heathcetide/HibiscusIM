@@ -14,7 +14,10 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jinzhu/inflection v1.0.0
 	github.com/minio/minio-go/v7 v7.0.95
+	github.com/mssola/user_agent v0.5.3
 	github.com/natefinch/lumberjack v2.0.0+incompatible
+	github.com/nicksnyder/go-i18n/v2 v2.0.2
+	github.com/oschwald/geoip2-golang v1.8.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pion/webrtc/v3 v3.3.5
 	github.com/prometheus/client_golang v1.23.0
@@ -101,6 +104,7 @@ require (
 	github.com/mozillazg/go-httpheader v0.2.1 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/oschwald/maxminddb-golang v1.10.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pion/datachannel v1.5.8 // indirect

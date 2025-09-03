@@ -23,6 +23,18 @@ type Config struct {
 	AuthPrefix       string `env:"AUTH_PREFIX"`
 	SessionSecret    string `env:"SESSION_SECRET"`
 	SecretExpireDays string `env:"SESSION_EXPIRE_DAYS"`
+	LLMApiKey        string `env:"LLM_API_KEY"`
+	LLMBaseURL       string `env:"LLM_BASE_URL"`
+	LLMModel         string `env:"LLM_MODEL"`
+	SearchEnabled    bool   `env:"SEARCH_ENABLED"`
+	SearchPath       string `env:"SEARCH_PATH"`
+	SearchBatchSize  int    `env:"SEARCH_BATCH_SIZE"`
+	MonitorPrefix    string `env:"MONITOR_PREFIX"`
+	LanguageEnabled  bool   `env:"LANGUAGE_ENABLED"`
+	APISecretKey     string `env:"API_SECRET_KEY"`
+	BackupEnabled    bool   `env:"BACKUP_ENABLED"`
+	BackupPath       string `env:"BACKUP_PATH"`
+	BackupSchedule   string `env:"BACKUP_SCHEDULE"`
 }
 
 var GlobalConfig *Config
@@ -65,6 +77,18 @@ func Load() error {
 			Port:     util.GetIntEnv("MAIL_PORT"),
 			From:     util.GetEnv("MAIL_FROM"),
 		},
+		LLMApiKey:       util.GetEnv("LLM_API_KEY"),
+		LLMBaseURL:      util.GetEnv("LLM_BASE_URL"),
+		LLMModel:        util.GetEnv("LLM_MODEL"),
+		SearchEnabled:   util.GetBoolEnv("SEARCH_ENABLED"),
+		SearchPath:      util.GetEnv("SEARCH_PATH"),
+		SearchBatchSize: int(util.GetIntEnv("SEARCH_BATCH_SIZE")),
+		MonitorPrefix:   util.GetEnv("MONITOR_PREFIX"),
+		LanguageEnabled: util.GetBoolEnv("LANGUAGE_ENABLED"),
+		APISecretKey:    util.GetEnv("API_SECRET_KEY"),
+		BackupEnabled:   util.GetBoolEnv("BACKUP_ENABLED"),
+		BackupPath:      util.GetEnv("BACKUP_PATH"),
+		BackupSchedule:  util.GetEnv("BACKUP_SCHEDULE"),
 	}
 	return nil
 }

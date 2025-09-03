@@ -5,27 +5,47 @@ import (
 	"HibiscusIM/internal/apidocs"
 	"HibiscusIM/internal/models"
 	"HibiscusIM/pkg/config"
+	"HibiscusIM/pkg/logger"
 	"HibiscusIM/pkg/middleware"
 	"HibiscusIM/pkg/notification"
+	"HibiscusIM/pkg/search"
 	"HibiscusIM/pkg/websocket"
+	"log"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type Handlers struct {
-	db    *gorm.DB
-	wsHub *websocket.Hub
+	db            *gorm.DB
+	wsHub         *websocket.Hub
+	searchHandler *search.SearchHandlers
 }
 
 func NewHandlers(db *gorm.DB) *Handlers {
-	// 创建WebSocket Hub
 	wsConfig := websocket.LoadConfigFromEnv()
 	wsHub := websocket.NewHub(wsConfig)
+	var searchHandler *search.SearchHandlers
+	if config.GlobalConfig.SearchEnabled {
+		engine, err := search.New(
+			search.Config{
+				IndexPath:    config.GlobalConfig.SearchPath,
+				QueryTimeout: 5 * time.Second,
+				BatchSize:    config.GlobalConfig.SearchBatchSize,
+			},
+			search.BuildIndexMapping(""),
+		)
+		if err != nil {
+			log.Fatalf("Failed to initialize search engine: %v", err)
+		}
+		searchHandler = search.NewSearchHandlers(engine)
+	}
 
 	return &Handlers{
-		db:    db,
-		wsHub: wsHub,
+		db:            db,
+		wsHub:         wsHub,
+		searchHandler: searchHandler,
 	}
 }
 
@@ -34,6 +54,11 @@ func (h *Handlers) Register(engine *gin.Engine) {
 
 	// Register Global Singleton DB
 	r.Use(middleware.InjectDB(h.db))
+	if config.GlobalConfig.SearchEnabled {
+		h.searchHandler.RegisterSearchRoutes(r)
+	} else {
+		logger.Info("Search API is disabled")
+	}
 	// Register System Module Routes
 	h.registerSystemRoutes(r)
 
@@ -165,10 +190,11 @@ func (h *Handlers) GetObjs() []hibiscusIM.WebObject {
 func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 	adminObjs := models.GetHibiscusAdminObjects()
 	iconInternalNotification, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_internal_notification.svg")
+	iconOperatorLog, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_operator_log.svg")
 	admins := []models.AdminObject{
 		{
 			Model:       &notification.InternalNotification{},
-			Group:       "Business",
+			Group:       "System",
 			Name:        "InternalNotification",
 			Desc:        "This is a notification used to notify the user of the system.",
 			Shows:       []string{"ID", "Title", "Read", "CreatedAt"},
@@ -177,9 +203,19 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 			Searchables: []string{"Title"},
 			Icon:        &models.AdminIcon{SVG: string(iconInternalNotification)},
 		},
+		{
+			Model:       &middleware.OperationLog{},                                  // 关联模型 OperationLog
+			Group:       "System",                                                    // 业务组
+			Name:        "Operation Log",                                             // 管理员后台展示的名称
+			Desc:        "Logs the operations performed by users in the system.",     // 描述
+			Shows:       []string{"ID", "Username", "Action", "Target", "CreatedAt"}, // 显示的字段
+			Editables:   []string{"Action", "Target", "Details"},                     // 可编辑字段
+			Orderables:  []string{"CreatedAt"},                                       // 可排序字段
+			Searchables: []string{"Username", "Action", "Target"},                    // 可搜索字段
+			Icon:        &models.AdminIcon{SVG: string(iconOperatorLog)},             // 图标
+		},
 	}
 	models.RegisterAdmins(router, h.db, append(adminObjs, admins...))
-
 }
 
 // registerWebSocketRoutes 注册WebSocket路由

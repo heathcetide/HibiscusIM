@@ -6,8 +6,10 @@ import (
 	"HibiscusIM/internal/listeners"
 	"HibiscusIM/internal/models"
 	"HibiscusIM/internal/task"
+	"HibiscusIM/pkg/backup"
 	"HibiscusIM/pkg/config"
 	constants "HibiscusIM/pkg/constant"
+	"HibiscusIM/pkg/i18n"
 	"HibiscusIM/pkg/logger"
 	"HibiscusIM/pkg/metrics"
 	"HibiscusIM/pkg/middleware"
@@ -123,35 +125,51 @@ func main() {
 	}
 
 	// 5. record configuration information
-	logger.Info("system config load finished",
-
-		// base
+	logger.Info("system config load finished")
+	logger.Info("base config",
 		zap.Int64("machine_id", config.GlobalConfig.MachineID),
 		zap.String("addr", config.GlobalConfig.Addr),
 		zap.String("db_driver", config.GlobalConfig.DBDriver),
 		zap.String("dsn", config.GlobalConfig.DSN),
 		zap.String("mode", config.GlobalConfig.Mode),
+		zap.String("monitor_prefix", config.GlobalConfig.MonitorPrefix),
+		zap.Bool("language_enabled", config.GlobalConfig.LanguageEnabled),
+		zap.String("api_secret_key", config.GlobalConfig.APISecretKey),
+	)
 
+	logger.Info("api config",
 		zap.String("api_prefix", config.GlobalConfig.APIPrefix),
 		zap.String("docs_prefix", config.GlobalConfig.DocsPrefix),
 		zap.String("admin_prefix", config.GlobalConfig.AdminPrefix),
 		zap.String("auth_prefix", config.GlobalConfig.AuthPrefix),
 		zap.String("secret_expire_days", config.GlobalConfig.SecretExpireDays),
 		zap.String("session_secret", config.GlobalConfig.SessionSecret),
+	)
 
-		// logger
+	logger.Info("log config",
 		zap.String("log_level", config.GlobalConfig.Log.Level),
 		zap.String("log_filename", config.GlobalConfig.Log.Filename),
 		zap.Int("log_max_size", config.GlobalConfig.Log.MaxSize),
 		zap.Int("log_max_age", config.GlobalConfig.Log.MaxAge),
 		zap.Int("log_max_backups", config.GlobalConfig.Log.MaxBackups),
+	)
 
-		// mail
+	logger.Info("mail config",
 		zap.String("mail_host", config.GlobalConfig.Mail.Host),
 		zap.String("mail_username", config.GlobalConfig.Mail.Username),
 		zap.String("mail_password", config.GlobalConfig.Mail.Password),
 		zap.String("mail_from", config.GlobalConfig.Mail.From),
 		zap.Int64("mail_port", config.GlobalConfig.Mail.Port),
+	)
+
+	logger.Info("llm config",
+		zap.String("llm_base_url", config.GlobalConfig.LLMBaseURL),
+		zap.String("llm_model", config.GlobalConfig.LLMModel),
+	)
+
+	logger.Info("search engine config",
+		zap.Bool("search engine enabled", config.GlobalConfig.SearchEnabled),
+		zap.String("search engine path", config.GlobalConfig.SearchPath),
 	)
 
 	// 6. load data source
@@ -170,6 +188,7 @@ func main() {
 		&models.Group{},
 		&models.GroupMember{},
 		&notification.InternalNotification{},
+		&middleware.OperationLog{},
 	})
 	if err != nil {
 		logger.Error("migration failed: ", zap.Error(err))
@@ -225,21 +244,25 @@ func main() {
 		MonitorInterval:     30 * time.Second,
 	})
 
-	// 设置全局监控器实例
+	// 12. Set Global Monitor
 	metrics.SetGlobalMonitor(monitor)
 
 	monitor.Start()
 	defer monitor.Stop()
 
-	// 12. Start timed task
+	// 13. Start timed task
 	go task.StartOfflineChecker(db)
+	// Start Backup Data
+	if config.GlobalConfig.BackupEnabled {
+		backup.StartBackupScheduler()
+	}
 
-	// 12. Initialize gin routing
+	// 14. Initialize gin routing
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.LoadHTMLGlob("templates/**/**")
 
-	// 13. use middleware
+	// 15. use middleware
 
 	// Monitoring Middleware
 	r.Use(metrics.MonitorMiddleware(monitor))
@@ -268,19 +291,28 @@ func main() {
 	// Assets Middleware
 	r.Use(hibiscusIM.WithStaticAssets(r, util.GetEnv(constants.ENV_STATIC_PREFIX), util.GetEnv(constants.ENV_STATIC_ROOT)))
 
-	// 14. Register Routes
+	// 16 Init I18n Support
+	if config.GlobalConfig.LanguageEnabled {
+		i18nSupport, err := i18n.NewI18nSupport("en") // 默认是英文
+		if err != nil {
+			log.Fatalf("Failed to initialize i18n: %v", err)
+		}
+		r.Use(middleware.LanguageMiddleware(i18nSupport))
+	}
+
+	// 17. Register Routes
 	app.RegisterRoutes(r)
 
-	// 15. Register Monitoring API Routes
+	// 18. Register Monitoring API Routes
 	monitorAPI := metrics.NewMonitorAPI(monitor)
-	monitorGroup := r.Group("/monitor")
+	monitorGroup := r.Group(config.GlobalConfig.MonitorPrefix)
 	monitorAPI.RegisterRoutes(monitorGroup)
 
-	// 16. Initialize User Listener
+	// 19. Initialize User Listener
 	listeners.InitUserListeners()
 
 	logger.Info("server run success", zap.String("addr", addr))
-	// 16. Start HTTP Server
+	// 20. Start HTTP Server
 	if err := r.Run(addr); err != nil {
 		logger.Error("server run failed", zap.Error(err))
 	}

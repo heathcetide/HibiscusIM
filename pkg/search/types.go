@@ -12,9 +12,9 @@ type Config struct {
 }
 
 type Doc struct {
-	ID     string
-	Type   string
-	Fields map[string]any
+	ID     string                 `json:"id"`
+	Type   string                 `json:"type"`
+	Fields map[string]interface{} `json:"fields"` // 使用 interface{} 来处理任何类型的数据
 }
 
 // -------- 过滤器 --------

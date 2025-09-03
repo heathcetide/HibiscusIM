@@ -3,6 +3,8 @@ package handlers
 import (
 	"HibiscusIM/internal/apidocs"
 	"HibiscusIM/internal/models"
+	"HibiscusIM/pkg/config"
+	"HibiscusIM/pkg/search"
 	"net/http"
 )
 
@@ -11,7 +13,7 @@ func (h *Handlers) GetDocs() []apidocs.UriDoc {
 	uriDocs := []apidocs.UriDoc{ // test
 		{
 			Group:   "User Authorization",
-			Path:    "/api/auth/login",
+			Path:    config.GlobalConfig.APIPrefix + "/auth/login",
 			Method:  http.MethodPost,
 			Desc:    "User login with email and password",
 			Request: apidocs.GetDocDefine(models.LoginForm{}),
@@ -25,14 +27,14 @@ func (h *Handlers) GetDocs() []apidocs.UriDoc {
 		},
 		{
 			Group:        "User Authorization",
-			Path:         "/api/auth/logout",
+			Path:         config.GlobalConfig.APIPrefix + "/auth/logout",
 			Method:       http.MethodPost,
 			AuthRequired: true,
 			Desc:         "User logout, if `?next={NEXT_URL}`is not empty, redirect to {NEXT_URL}",
 		},
 		{
 			Group:        "User Authorization",
-			Path:         "/api/auth/register",
+			Path:         config.GlobalConfig.APIPrefix + "/auth/register",
 			Method:       http.MethodPost,
 			AuthRequired: false,
 			Desc:         "User register with email and password",
@@ -48,7 +50,7 @@ func (h *Handlers) GetDocs() []apidocs.UriDoc {
 		},
 		{
 			Group:        "User Authorization",
-			Path:         "/api/auth/reset_password",
+			Path:         config.GlobalConfig.APIPrefix + "/auth/reset_password",
 			Method:       http.MethodPost,
 			AuthRequired: false,
 			Desc:         "Send a verification code to the email address, and then click the link in the email to reset the password",
@@ -62,7 +64,7 @@ func (h *Handlers) GetDocs() []apidocs.UriDoc {
 		},
 		{
 			Group:        "User Authorization",
-			Path:         "/api/auth/reset_password_done",
+			Path:         config.GlobalConfig.APIPrefix + "/auth/reset_password_done",
 			Method:       http.MethodPost,
 			AuthRequired: false,
 			Desc:         "Setup new password",
@@ -74,7 +76,7 @@ func (h *Handlers) GetDocs() []apidocs.UriDoc {
 		},
 		{
 			Group:        "User Authorization",
-			Path:         "/api/auth/change_password",
+			Path:         config.GlobalConfig.APIPrefix + "/auth/change_password",
 			Method:       http.MethodPost,
 			AuthRequired: false,
 			Desc:         "Setup new password when user is logged in",
@@ -86,7 +88,7 @@ func (h *Handlers) GetDocs() []apidocs.UriDoc {
 		},
 		{
 			Group:        "User Authorization",
-			Path:         "/api/auth/send/email",
+			Path:         config.GlobalConfig.APIPrefix + "/auth/send/email",
 			Method:       http.MethodPost,
 			AuthRequired: false,
 			Desc:         "Send email verification code",
@@ -106,6 +108,101 @@ func (h *Handlers) GetDocs() []apidocs.UriDoc {
 			AuthRequired: false,
 			Desc:         `检查数据库健康状态`,
 		},
+	}
+
+	if config.GlobalConfig.SearchEnabled {
+		uriDocs = append(uriDocs, []apidocs.UriDoc{
+			{
+				Group:   "Search",
+				Path:    config.GlobalConfig.APIPrefix + "/search",
+				Method:  http.MethodPost,
+				Desc:    "Execute a search query",
+				Request: apidocs.GetDocDefine(search.SearchRequest{}),
+				Response: &apidocs.DocField{
+					Type: "object",
+					Fields: []apidocs.DocField{
+						{Name: "Total", Type: apidocs.TYPE_INT},
+						{Name: "Took", Type: apidocs.TYPE_INT},
+						{Name: "Hits", Type: "array", Fields: []apidocs.DocField{
+							{Name: "ID", Type: apidocs.TYPE_STRING},
+							{Name: "Score", Type: apidocs.TYPE_FLOAT},
+							{Name: "Fields", Type: "object"},
+						}},
+					},
+				},
+			},
+			{
+				Group:        "Search",
+				Path:         config.GlobalConfig.APIPrefix + "/search/index",
+				Method:       http.MethodPost,
+				AuthRequired: true,
+				Desc:         "Index a new document",
+				Request:      apidocs.GetDocDefine(search.Doc{}),
+				Response: &apidocs.DocField{
+					Type: apidocs.TYPE_BOOLEAN,
+					Desc: "true if document is indexed successfully",
+				},
+			},
+			{
+				Group:        "Search",
+				Path:         config.GlobalConfig.APIPrefix + "/search/delete",
+				Method:       http.MethodPost,
+				AuthRequired: true,
+				Desc:         "Delete a document by its ID",
+				Request: &apidocs.DocField{
+					Type: "object",
+					Fields: []apidocs.DocField{
+						{Name: "ID", Type: apidocs.TYPE_STRING},
+					},
+				},
+				Response: &apidocs.DocField{
+					Type: apidocs.TYPE_BOOLEAN,
+					Desc: "true if document is deleted successfully",
+				},
+			},
+			{
+				Group:        "Search",
+				Path:         config.GlobalConfig.APIPrefix + "/search/auto-complete",
+				Method:       http.MethodPost,
+				AuthRequired: false,
+				Desc:         "Get search query auto-completion suggestions",
+				Request: &apidocs.DocField{
+					Type: "object",
+					Fields: []apidocs.DocField{
+						{Name: "Keyword", Type: apidocs.TYPE_STRING},
+					},
+				},
+				Response: &apidocs.DocField{
+					Type: "object",
+					Fields: []apidocs.DocField{
+						{Name: "suggestions", Type: "array", Fields: []apidocs.DocField{
+							{Name: "suggestion", Type: apidocs.TYPE_STRING},
+						}},
+					},
+				},
+			},
+			{
+				Group:        "Search",
+				Path:         config.GlobalConfig.APIPrefix + "/search/suggest",
+				Method:       http.MethodPost,
+				AuthRequired: false,
+				Desc:         "Get search suggestions based on the keyword",
+				Request: &apidocs.DocField{
+					Type: "object",
+					Fields: []apidocs.DocField{
+						{Name: "Keyword", Type: apidocs.TYPE_STRING},
+					},
+				},
+				Response: &apidocs.DocField{
+					Type: "object",
+					Fields: []apidocs.DocField{
+						{Name: "suggestions", Type: "array", Fields: []apidocs.DocField{
+							{Name: "suggestion", Type: apidocs.TYPE_STRING},
+						}},
+					},
+				},
+			},
+		}...)
 	}
 	return uriDocs
 }

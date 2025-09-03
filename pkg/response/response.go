@@ -14,7 +14,7 @@ type Response struct {
 
 func Success(c *gin.Context, msg string, data interface{}) {
 	c.JSON(http.StatusOK, gin.H{
-		"code": 200,
+		"code": http.StatusOK,
 		"msg":  msg,
 		"data": data,
 	})
@@ -22,7 +22,7 @@ func Success(c *gin.Context, msg string, data interface{}) {
 
 func Fail(c *gin.Context, msg string, data interface{}) {
 	c.JSON(http.StatusOK, gin.H{
-		"code": 500,
+		"code": http.StatusInternalServerError,
 		"msg":  msg,
 		"data": data,
 	})

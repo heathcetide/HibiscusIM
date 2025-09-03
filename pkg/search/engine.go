@@ -3,10 +3,11 @@ package search
 import (
 	"context"
 	"errors"
-	"github.com/blevesearch/bleve/v2/mapping"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/blevesearch/bleve/v2/mapping"
 
 	"github.com/blevesearch/bleve/v2"
 )
@@ -18,6 +19,8 @@ type Engine interface {
 	IndexBatch(ctx context.Context, docs []Doc) error
 	Delete(ctx context.Context, id string) error
 	Search(ctx context.Context, req SearchRequest) (SearchResult, error)
+	GetAutoCompleteSuggestions(ctx context.Context, keyword string) ([]string, error)
+	GetSearchSuggestions(ctx context.Context, keyword string) ([]string, error)
 	Close() error
 }
 
@@ -244,4 +247,45 @@ func (e *bleveEngine) Close() error {
 	}
 	e.closed = true
 	return e.index.Close()
+}
+
+func (e *bleveEngine) GetAutoCompleteSuggestions(ctx context.Context, keyword string) ([]string, error) {
+	// 这里假设你用前缀查询实现自动补全
+	query := bleve.NewPrefixQuery(keyword)
+	sr := bleve.NewSearchRequest(query)
+	sr.Size = 5 // 限制返回最多5个建议
+
+	searchResult, err := e.index.Search(sr)
+	if err != nil {
+		return nil, err
+	}
+
+	var suggestions []string
+	for _, hit := range searchResult.Hits {
+		// 根据需要，可以提取 `hit.Fields` 来作为补全建议
+		suggestions = append(suggestions, hit.ID)
+	}
+
+	return suggestions, nil
+}
+
+func (e *bleveEngine) GetSearchSuggestions(ctx context.Context, keyword string) ([]string, error) {
+	// 这里可以通过索引中的某些字段获取搜索建议
+	// 例如，你可以查询所有标题或者文章内容来生成相关建议
+	query := bleve.NewMatchQuery(keyword)
+	sr := bleve.NewSearchRequest(query)
+	sr.Size = 5 // 限制返回最多5个建议
+
+	searchResult, err := e.index.Search(sr)
+	if err != nil {
+		return nil, err
+	}
+
+	var suggestions []string
+	for _, hit := range searchResult.Hits {
+		// 假设我们通过 ID 来推荐建议，也可以根据需要提取其他字段
+		suggestions = append(suggestions, hit.ID)
+	}
+
+	return suggestions, nil
 }
