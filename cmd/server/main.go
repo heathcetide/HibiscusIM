@@ -42,9 +42,9 @@ func NewHibiscusIMApp(db *gorm.DB) *HibiscusIMApp {
 func initDefaultConfigs(db *gorm.DB) error {
 	defaults := []util.Config{
 		{Key: constants.KEY_SITE_URL, Desc: "站点网址", Autoload: true, Public: true, Format: "text", Value: "https://codeonezerozero.cn"},
-		{Key: constants.KEY_SITE_NAME, Desc: "站点名称", Autoload: true, Public: true, Format: "text", Value: "HibiscusIM"},
+		{Key: constants.KEY_SITE_NAME, Desc: "站点名称", Autoload: true, Public: true, Format: "text", Value: "Hibiscus"},
 		{Key: constants.KEY_SITE_LOGO_URL, Desc: "站点Logo", Autoload: true, Public: true, Format: "text", Value: "/static/img/favicon.png"},
-		{Key: constants.KEY_SITE_DESCRIPTION, Desc: "站点描述", Autoload: true, Public: true, Format: "text", Value: "HibiscusIM - IM平台"},
+		{Key: constants.KEY_SITE_DESCRIPTION, Desc: "站点描述", Autoload: true, Public: true, Format: "text", Value: "Hibiscus - 平台"},
 		{Key: constants.KEY_SITE_SIGNIN_URL, Desc: "登录页面", Autoload: true, Public: true, Format: "text", Value: config.GlobalConfig.APIPrefix + "/auth/login"},
 		{Key: constants.KEY_SITE_FAVICON_URL, Desc: "站点图标", Autoload: true, Public: true, Format: "text", Value: "/static/img/favicon.png"},
 		{Key: constants.KEY_SITE_SIGNUP_URL, Desc: "注册页面", Autoload: true, Public: true, Format: "text", Value: config.GlobalConfig.APIPrefix + "/auth/register"},
@@ -53,7 +53,7 @@ func initDefaultConfigs(db *gorm.DB) error {
 		{Key: constants.KEY_SITE_SIGNIN_API, Desc: "登录接口", Autoload: true, Public: true, Format: "text", Value: config.GlobalConfig.APIPrefix + "/auth/login"},
 		{Key: constants.KEY_SITE_SIGNUP_API, Desc: "注册接口", Autoload: true, Public: true, Format: "text", Value: config.GlobalConfig.APIPrefix + "/auth/register"},
 		{Key: constants.KEY_SITE_RESET_PASSWORD_DONE_API, Desc: "重置密码接口", Autoload: true, Public: true, Format: "text", Value: config.GlobalConfig.APIPrefix + "/auth/reset-password-done"},
-		{Key: constants.KEY_SITE_LOGIN_NEXT, Desc: "登录成功后跳转页面", Autoload: true, Public: true, Format: "text", Value: config.GlobalConfig.APIPrefix + "/admin"},
+		{Key: constants.KEY_SITE_LOGIN_NEXT, Desc: "登录成功后跳转页面", Autoload: true, Public: true, Format: "text", Value: config.GlobalConfig.APIPrefix + "/admin/user"},
 		{Key: constants.KEY_SITE_USER_ID_TYPE, Desc: "用户ID类型", Autoload: true, Public: true, Format: "text", Value: "email"},
 		{Key: constants.KEY_SITE_TERMS_URL, Desc: "服务条款", Autoload: true, Public: true, Format: "text", Value: "https://codeonezerozero.cn"},
 	}
@@ -192,6 +192,8 @@ func main() {
 		&models.Questionnaire{},
 		&models.QuestionnaireResponse{},
 		&models.RecordingPrompt{},
+		&models.VoiceJob{},
+		&models.Recording{},
 		&notification.InternalNotification{},
 		&middleware.OperationLog{},
 	})

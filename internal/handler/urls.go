@@ -216,6 +216,9 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 	iconQuestionnaire, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_questionnaire.svg")
 	iconAnswer, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_answer.svg")
 	iconQuestionnaireResponse, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_questionnaire_response.svg")
+	iconRecording, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_recording.svg")
+	iconRecordingPrompt, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_recording_prompt.svg")
+	iconVoiceJob, _ := hibiscusIM.EmbedStaticAssets.ReadFile("static/img/icon_voice_job.svg")
 	admins := []models.AdminObject{
 		{
 			Model:       &notification.InternalNotification{},
@@ -282,6 +285,39 @@ func (h *Handlers) RegisterAdmin(router *gin.RouterGroup) {
 			Orderables:  []string{"CreatedAt"},                                     // 可排序字段
 			Searchables: []string{"UserID", "QuestionnaireID"},                     // 可搜索字段
 			Icon:        &models.AdminIcon{SVG: string(iconQuestionnaireResponse)}, // 图标
+		},
+		{
+			Model:       &models.RecordingPrompt{},                                            // 关联 RecordingPrompt 模型
+			Group:       "Recording",                                                          // 业务组
+			Name:        "Recording Prompt",                                                   // 管理员后台展示名称
+			Desc:        "This is a recording prompt, a sentence to be recorded by the user.", // 描述
+			Shows:       []string{"ID", "Text", "Order", "CreatedAt"},
+			Editables:   []string{"Text", "Order"},
+			Orderables:  []string{"CreatedAt"},
+			Searchables: []string{"Text"},
+			Icon:        &models.AdminIcon{SVG: string(iconRecordingPrompt)}, // 图标
+		},
+		{
+			Model:       &models.Recording{},                                    // 关联 Recording 模型
+			Group:       "Recording",                                            // 业务组
+			Name:        "Recording",                                            // 管理员后台展示名称
+			Desc:        "This records the user’s voice for a specific prompt.", // 描述
+			Shows:       []string{"ID", "UserID", "PromptID", "FileURL", "Format", "DurationMs", "Status", "CreatedAt"},
+			Editables:   []string{"UserID", "PromptID", "FileURL", "Format", "DurationMs", "Status"},
+			Orderables:  []string{"CreatedAt"},
+			Searchables: []string{"FileURL", "Status"},
+			Icon:        &models.AdminIcon{SVG: string(iconRecording)}, // 图标
+		},
+		{
+			Model:       &models.VoiceJob{},                                            // 关联 VoiceJob 模型
+			Group:       "Recording",                                                   // 业务组
+			Name:        "Voice Job",                                                   // 管理员后台展示名称
+			Desc:        "This represents a voice job for processing user recordings.", // 描述
+			Shows:       []string{"ID", "UserID", "Status", "Progress", "CreatedAt"},
+			Editables:   []string{"UserID", "Status", "Progress"},
+			Orderables:  []string{"CreatedAt"},
+			Searchables: []string{"Status", "Progress"},
+			Icon:        &models.AdminIcon{SVG: string(iconVoiceJob)}, // 图标
 		},
 	}
 	models.RegisterAdmins(router, h.db, append(adminObjs, admins...))
