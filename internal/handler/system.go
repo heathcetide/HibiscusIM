@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"HibiscusIM/pkg/middleware"
+	"HibiscusIM/pkg/response"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,13 +12,13 @@ import (
 func (h *Handlers) UpdateRateLimiterConfig(c *gin.Context) {
 	var config middleware.RateLimiterConfig
 	if err := c.ShouldBindJSON(&config); err != nil {
-		c.JSON(400, gin.H{"error": "invalid request"})
+		response.Fail(c, "invalid request", nil)
 		return
 	}
 
 	// 更新限流配置
 	middleware.SetRateLimiterConfig(config)
-	c.JSON(200, gin.H{"message": "rate limiter config updated"})
+	response.Success(c, "rate limiter config updated", nil)
 }
 
 // HealthCheck 健康检查接口
